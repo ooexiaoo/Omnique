@@ -30,8 +30,11 @@ jobs:
           targets: ${{ matrix.target }}
 
       - name: Install cross-compilation deps
-        if: matrix.target == 'aarch64-unknown-linux-gnu'
-        run: sudo apt-get install -y gcc-aarch64-linux-gnu
+        run: |
+          case ${{ matrix.target }} in
+            aarch64-unknown-linux-gnu) sudo apt-get install -y gcc-aarch64-linux-gnu ;;
+            x86_64-pc-windows-gnu)    sudo apt-get install -y mingw-w64 ;;
+          esac
 
       - name: Build
         run: cargo build --release --target ${{ matrix.target }}
@@ -42,9 +45,10 @@ jobs:
           strip target/${{ matrix.target }}/release/omnique${{ matrix.ext }}
           tar czf omnique-${{ matrix.target }}.tar.gz -C target/${{ matrix.target }}/release omnique${{ matrix.ext }}
 
-      - name: Package (Windows)
+      - name: Strip and package (Windows)
         if: matrix.ext == '.exe'
         run: |
+          x86_64-w64-mingw32-strip target/${{ matrix.target }}/release/omnique.exe
           zip -j omnique-${{ matrix.target }}.zip target/${{ matrix.target }}/release/omnique${{ matrix.ext }}
 
       - uses: softprops/action-gh-release@v2
