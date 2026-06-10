@@ -46,16 +46,22 @@ jobs:
         run: cargo build --release --target ${{ matrix.target }}
 
       - name: Strip binary
-        if: matrix.ext == ''
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
         run: |
-          strip target/${{ matrix.target }}/release/omnique${{ matrix.ext }}
-          tar czf omnique-${{ matrix.target }}.tar.gz -C target/${{ matrix.target }}/release omnique${{ matrix.ext }}
+          strip target/${{ matrix.target }}/release/omnique
+          tar czf omnique-${{ matrix.target }}.tar.gz -C target/${{ matrix.target }}/release omnique
+
+      - name: Strip and package (ARM64)
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          aarch64-linux-gnu-strip target/${{ matrix.target }}/release/omnique
+          tar czf omnique-${{ matrix.target }}.tar.gz -C target/${{ matrix.target }}/release omnique
 
       - name: Strip and package (Windows)
         if: matrix.ext == '.exe'
         run: |
           x86_64-w64-mingw32-strip target/${{ matrix.target }}/release/omnique.exe
-          zip -j omnique-${{ matrix.target }}.zip target/${{ matrix.target }}/release/omnique${{ matrix.ext }}
+          zip -j omnique-${{ matrix.target }}.zip target/${{ matrix.target }}/release/omnique.exe
 
       - uses: softprops/action-gh-release@v2
         with:
