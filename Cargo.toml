@@ -13,3 +13,7 @@ color-eyre = "0.6"
 anyhow = "1"
 directories = "5"
 chrono = "0.4"
+nucleo = "0.5"
+rusqlite = { version = "0.32", features = ["bundled", "vtab"] }
+ignore = "0.4"
+toml = "0.8"

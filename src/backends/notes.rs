@@ -1,56 +1,43 @@
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
-use std::process::Command;
 
 use super::{ResultKind, SearchBackend, SearchResult};
 
-const MAX_FILE_SIZE: u64 = 10 * 1024 * 1024; // 10 MB
+const MAX_FILE_SIZE: u64 = 5 * 1024 * 1024; // 5 MB
 
-pub struct FilesBackend;
+pub struct NotesBackend {
+    notes_dir: String,
+}
 
-impl FilesBackend {
+impl NotesBackend {
     pub fn new() -> Self {
-        Self
-    }
-
-    fn find_repo_root() -> Option<String> {
-        let output = Command::new("git")
-            .args(["rev-parse", "--show-toplevel"])
-            .output()
-            .ok()?;
-        if output.status.success() {
-            Some(String::from_utf8_lossy(&output.stdout).trim().to_string())
-        } else {
-            None
+        let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+        let candidates = vec![
+            format!("{}/notes", home),
+            format!("{}/Obsidian", home),
+            format!("{}/Documents/notes", home),
+            format!("{}/Documents/Obsidian", home),
+        ];
+        let dir = candidates.into_iter().find(|d| std::path::Path::new(d).exists());
+        Self {
+            notes_dir: dir.unwrap_or_else(|| format!("{}/notes", home)),
         }
     }
 
-    fn is_binary(path: &Path) -> bool {
-        const BINARY_EXTENSIONS: &[&str] = &[
-            "png", "jpg", "jpeg", "gif", "bmp", "ico", "webp",
-            "mp3", "wav", "ogg", "flac", "m4a",
-            "mp4", "avi", "mkv", "mov", "webm",
-            "zip", "tar", "gz", "bz2", "xz", "7z", "rar",
-            "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
-            "ttf", "otf", "woff", "woff2",
-            "o", "so", "a", "dylib", "exe", "dll", "class",
-            "pyc", "pyo",
-        ];
-        path.extension()
-            .and_then(|e| e.to_str())
-            .map(|e| BINARY_EXTENSIONS.contains(&e.to_lowercase().as_str()))
-            .unwrap_or(false)
+    #[allow(dead_code)]
+    pub fn with_dir(dir: String) -> Self {
+        Self { notes_dir: dir }
     }
 }
 
-impl SearchBackend for FilesBackend {
+impl SearchBackend for NotesBackend {
     fn name(&self) -> &'static str {
-        "files"
+        "notes"
     }
 
     fn icon(&self) -> &'static str {
-        "\u{1f4c1}"
+        "\u{1f4dd}"
     }
 
     fn search(&self, query: &str, max_results: usize) -> Vec<SearchResult> {
@@ -58,11 +45,15 @@ impl SearchBackend for FilesBackend {
             return vec![];
         }
 
-        let search_dir = Self::find_repo_root().unwrap_or_else(|| ".".to_string());
+        let notes_path = Path::new(&self.notes_dir);
+        if !notes_path.exists() {
+            return vec![];
+        }
+
         let query_lower = query.to_lowercase();
         let mut results = Vec::new();
 
-        let walker = ignore::WalkBuilder::new(&search_dir)
+        let walker = ignore::WalkBuilder::new(notes_path)
             .standard_filters(true)
             .follow_links(false)
             .build();
@@ -74,7 +65,12 @@ impl SearchBackend for FilesBackend {
             };
 
             let path = entry.path();
-            if !path.is_file() || Self::is_binary(path) {
+            if !path.is_file() {
+                continue;
+            }
+
+            let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+            if ext != "md" && ext != "markdown" && ext != "txt" && ext != "org" {
                 continue;
             }
 
@@ -104,14 +100,13 @@ impl SearchBackend for FilesBackend {
                     continue;
                 }
 
-                let rel_path = path.to_string_lossy().to_string();
                 results.push(SearchResult {
-                    backend: "files".to_string(),
-                    icon: "\u{1f4c1}".to_string(),
+                    backend: "notes".to_string(),
+                    icon: "\u{1f4dd}".to_string(),
                     score: 100 - results.len() as i64,
-                    title: format!("{}:{}", rel_path, line_num + 1),
+                    title: format!("{}:{}", path.display(), line_num + 1),
                     subtitle: Some(line.trim().to_string()),
-                    kind: ResultKind::File {
+                    kind: ResultKind::Note {
                         path: path.to_string_lossy().to_string(),
                         line: line_num + 1,
                         content: line,
