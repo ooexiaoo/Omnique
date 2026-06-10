@@ -63,9 +63,16 @@ jobs:
           x86_64-w64-mingw32-strip target/${{ matrix.target }}/release/omnique.exe
           zip -j omnique-${{ matrix.target }}.zip target/${{ matrix.target }}/release/omnique.exe
 
+      - name: Set release asset names
+        id: assets
+        run: |
+          if [ "${{ matrix.ext }}" = ".exe" ]; then
+            echo "files=omnique-${{ matrix.target }}.zip" >> $GITHUB_OUTPUT
+          else
+            echo "files=omnique-${{ matrix.target }}.tar.gz" >> $GITHUB_OUTPUT
+          fi
+
       - uses: softprops/action-gh-release@v2
         with:
-          files: |
-            omnique-${{ matrix.target }}.tar.gz
-            omnique-${{ matrix.target }}.zip
+          files: ${{ steps.assets.outputs.files }}
           draft: true
